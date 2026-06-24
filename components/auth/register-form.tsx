@@ -63,6 +63,11 @@ export function RegisterForm() {
               minLength={8}
             />
           </div>
+          {state.message ? (
+            <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              {state.message}
+            </p>
+          ) : null}
           {state.error ? (
             <p className="text-sm text-destructive">{state.error}</p>
           ) : null}

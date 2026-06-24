@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { seedDefaultBusinessHours } from "@/lib/business/hours";
 import { getOwnerBusiness } from "@/lib/business/queries";
 import { businessSetupSchema } from "@/lib/validations/business";
 import { createClient } from "@/utils/supabase/server";
@@ -40,20 +41,35 @@ export async function createBusiness(
     redirect("/dashboard");
   }
 
-  const { error } = await supabase.from("book_businesses").insert({
-    owner_id: user.id,
-    name: parsed.data.name,
-    slug: parsed.data.slug,
-    timezone: parsed.data.timezone,
-    currency: parsed.data.currency,
-    brand_color: parsed.data.brandColor,
-  });
+  const { data: created, error } = await supabase
+    .from("book_businesses")
+    .insert({
+      owner_id: user.id,
+      name: parsed.data.name,
+      slug: parsed.data.slug,
+      timezone: parsed.data.timezone,
+      currency: parsed.data.currency,
+      brand_color: parsed.data.brandColor,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
       return { error: "This booking URL slug is already taken. Try another." };
     }
     return { error: error.message };
+  }
+
+  try {
+    await seedDefaultBusinessHours(supabase, created.id);
+  } catch (hoursError) {
+    await supabase.from("book_businesses").delete().eq("id", created.id);
+    const message =
+      hoursError instanceof Error
+        ? hoursError.message
+        : "Failed to set default working hours.";
+    return { error: message };
   }
 
   redirect("/dashboard");

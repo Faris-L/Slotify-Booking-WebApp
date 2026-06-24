@@ -1,21 +1,12 @@
 import Link from "next/link";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getOwnerBusiness } from "@/lib/business/queries";
-import { createClient } from "@/utils/supabase/server";
+import { StatsOverview } from "@/components/dashboard/stats-overview";
+import { getDashboardStats } from "@/lib/bookings/queries";
+import { requireOwnerContext } from "@/lib/business/context";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const business = user ? await getOwnerBusiness(supabase, user.id) : null;
+  const { supabase, business } = await requireOwnerContext();
+  const stats = await getDashboardStats(supabase, business.id, business.timezone);
 
   return (
     <div className="space-y-6">
@@ -24,50 +15,25 @@ export default async function DashboardPage() {
           Dashboard
         </h1>
         <p className="mt-1 text-muted-foreground">
-          Welcome back. Your business is ready for the next setup steps.
+          Today and this week at a glance for {business.name}.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-sky-100">
-          <CardHeader>
-            <CardTitle>{business?.name ?? "Your business"}</CardTitle>
-            <CardDescription>Public booking page</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Your page will be available at:
-            </p>
-            <code className="block rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
-              /{business?.slug}
-            </code>
-            <p className="text-xs text-muted-foreground">
-              The public booking flow arrives in Phase 5.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-sky-100">
-          <CardHeader>
-            <CardTitle>Next steps</CardTitle>
-            <CardDescription>Phase 3 — business configuration</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-inside list-disc space-y-1 text-sm text-muted-foreground">
-              <li>Add services and categories</li>
-              <li>Add staff members</li>
-              <li>Set working hours and time off</li>
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsOverview stats={stats} slug={business.slug} />
 
       <p className="text-sm text-muted-foreground">
-        Signed in as{" "}
-        <span className="font-medium text-foreground">{user?.email}</span>
+        Manage appointments in{" "}
+        <Link href="/calendar" className="text-primary hover:underline">
+          Calendar
+        </Link>
         {" · "}
-        <Link href="/" className="text-primary hover:underline">
-          Back to home
+        Configure{" "}
+        <Link href="/services" className="text-primary hover:underline">
+          Services
+        </Link>
+        {" and "}
+        <Link href="/schedule" className="text-primary hover:underline">
+          Schedule
         </Link>
       </p>
     </div>

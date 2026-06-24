@@ -7,6 +7,7 @@ import { createClient } from "@/utils/supabase/server";
 
 export type AuthActionState = {
   error?: string;
+  message?: string;
 };
 
 function safeRedirectPath(next: string | null | undefined): string {
@@ -14,6 +15,28 @@ function safeRedirectPath(next: string | null | undefined): string {
     return "/dashboard";
   }
   return next;
+}
+
+function mapAuthError(message: string): string {
+  const lower = message.toLowerCase();
+
+  if (lower.includes("email signups are disabled")) {
+    return "Email signups are disabled in Supabase. Enable them under Authentication → Providers → Email → Enable Email provider + Allow new users to sign up.";
+  }
+
+  if (lower.includes("email not confirmed")) {
+    return "Email not confirmed. Check your inbox or disable Confirm email in Supabase Auth settings.";
+  }
+
+  if (lower.includes("invalid login credentials")) {
+    return "Invalid email or password.";
+  }
+
+  if (lower.includes("user already registered")) {
+    return "An account with this email already exists. Sign in or reset your password.";
+  }
+
+  return message;
 }
 
 export async function signIn(
@@ -33,7 +56,7 @@ export async function signIn(
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
   if (error) {
-    return { error: error.message };
+    return { error: mapAuthError(error.message) };
   }
 
   redirect(safeRedirectPath(formData.get("next")?.toString()));
@@ -60,21 +83,35 @@ export async function signUp(
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: mapAuthError(error.message) };
   }
 
-  if (!data.session) {
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
+  if (data.session) {
+    redirect("/setup");
+  }
 
-    if (signInError) {
+  // signUp succeeded but no session — email confirmation is enabled in Supabase
+  if (data.user && !data.user.email_confirmed_at) {
+    return {
+      message:
+        "Account created. Check your email and confirm your address, then sign in. For development: Supabase Dashboard → Authentication → Providers → Email → disable Confirm email.",
+    };
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (signInError) {
+    if (signInError.message.toLowerCase().includes("email not confirmed")) {
       return {
-        error:
-          "Account created but sign-in failed. Disable email confirmation in Supabase Auth settings.",
+        message:
+          "Email not confirmed. Check your inbox or disable Confirm email in Supabase Auth settings.",
       };
     }
+
+    return { error: mapAuthError(signInError.message) };
   }
 
   redirect("/setup");

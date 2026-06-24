@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import { seedDefaultBusinessHours } from "@/lib/business/hours";
 import { getOwnerBusiness } from "@/lib/business/queries";
 import { createClient } from "@/utils/supabase/server";
 
@@ -22,6 +23,8 @@ export default async function DashboardLayout({
   if (!business) {
     redirect("/setup");
   }
+
+  await seedDefaultBusinessHours(supabase, business.id);
 
   return (
     <DashboardShell businessName={business.name}>{children}</DashboardShell>
